@@ -3,6 +3,7 @@
 #   ansible-playbook playbooks/bootstrap.yml --limit k3s-master
 - name: Bootstrap template clone
   hosts: k3s_cluster
+  become: true
   vars:
     # Reach the node through the template's SSH alias until it has its own IP.
     ansible_host: "{{ template_host }}"
@@ -19,6 +20,7 @@
 
 - name: Check the node is reachable under its own name
   hosts: k3s_cluster
+  become: true
   tasks:
     - name: Assert hostname
       ansible.builtin.assert:

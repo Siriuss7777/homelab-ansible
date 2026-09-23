@@ -1,20 +1,24 @@
 ---
 - name: Base configuration
   hosts: k3s_cluster
+  become: true
   roles:
     - common
 
 - name: Worker data disk
   hosts: k3s_workers
+  become: true
   roles:
     - worker_storage
 
 - name: K3s server
   hosts: k3s_masters
+  become: true
   roles:
     - k3s_server
 
 - name: K3s agent
   hosts: k3s_workers
+  become: true
   roles:
     - k3s_agent

@@ -1,7 +1,6 @@
 ---
-ansible_become: true
 
 # ~/.ssh/config alias every fresh template clone answers on.
 template_host: homeserver-template
 
-timezone: Europe/London
+timezone: Europe/Dublin
