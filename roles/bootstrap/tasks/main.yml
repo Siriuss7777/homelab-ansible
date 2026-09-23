@@ -1,0 +1,57 @@
+---
+# A clone of the template shares machine-id and SSH host keys with every other
+# clone. Regenerate them once, tracked by a marker file.
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Resolve hostname locally
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s'
+    line: "127.0.1.1 {{ inventory_hostname }}"
+
+- name: Check de-templating marker
+  ansible.builtin.stat:
+    path: "{{ bootstrap_marker }}"
+  register: bootstrap_marker_stat
+
+- name: De-template the clone
+  when: not bootstrap_marker_stat.stat.exists
+  block:
+    - name: Remove cloned machine-id
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/machine-id
+        - /var/lib/dbus/machine-id
+
+    - name: Generate a new machine-id
+      ansible.builtin.command: systemd-machine-id-setup
+      changed_when: true
+
+    - name: Find cloned SSH host keys
+      ansible.builtin.find:
+        paths: /etc/ssh
+        patterns: "ssh_host_*"
+      register: bootstrap_host_keys
+
+    - name: Remove cloned SSH host keys
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ bootstrap_host_keys.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Generate new SSH host keys
+      ansible.builtin.command: ssh-keygen -A
+      changed_when: true
+      notify: Restart ssh
+
+    - name: Write de-templating marker
+      ansible.builtin.copy:
+        dest: "{{ bootstrap_marker }}"
+        content: "{{ inventory_hostname }}\n"
+        mode: "0644"

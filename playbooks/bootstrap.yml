@@ -1,0 +1,7 @@
+---
+# Only de-template a fresh clone (hostname, machine-id, SSH host keys) + base packages.
+- name: Bootstrap cloned VMs
+  hosts: k3s_cluster
+  roles:
+    - bootstrap
+    - common

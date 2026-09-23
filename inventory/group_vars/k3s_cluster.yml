@@ -1,0 +1,14 @@
+---
+# Pin a release (e.g. "v1.xx.y+k3s1") for reproducible installs; empty = k3s_channel.
+k3s_version: ""
+k3s_channel: stable
+
+# First master's address is the API endpoint the worker joins.
+k3s_api_host: "{{ hostvars[groups['k3s_masters'][0]].ansible_host }}"
+k3s_api_url: "https://{{ k3s_api_host }}:6443"
+k3s_install_env: >-
+  {{ {'INSTALL_K3S_VERSION': k3s_version} if k3s_version
+     else {'INSTALL_K3S_CHANNEL': k3s_channel} }}
+
+# local-path-provisioner data dir; on the worker it is the 1 TB disk mountpoint.
+k3s_data_mountpoint: /var/lib/rancher/k3s/storage

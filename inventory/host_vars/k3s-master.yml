@@ -1,0 +1,9 @@
+---
+k3s_server_config:
+  write-kubeconfig-mode: "0644"
+  disable:
+    - servicelb  # replaced by MetalLB (L2)
+  node-taint:
+    - CriticalAddonsOnly=true:NoExecute  # workloads run on the worker only
+  tls-san:
+    - "{{ ansible_host }}"

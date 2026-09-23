@@ -1,0 +1,24 @@
+---
+# Must run before the K3s agent is installed, otherwise PVs land on the 32 GB system disk.
+- name: Require the data disk device
+  ansible.builtin.assert:
+    that: k3s_data_disk | default("") | length > 0
+    fail_msg: "Set k3s_data_disk in inventory/host_vars/{{ inventory_hostname }}.yml (check lsblk)."
+
+- name: Create ext4 filesystem on the data disk (never reformats an existing one)
+  community.general.filesystem:
+    dev: "{{ k3s_data_disk }}"
+    fstype: ext4
+
+- name: Read data disk UUID
+  ansible.builtin.command: blkid -s UUID -o value {{ k3s_data_disk }}
+  register: worker_storage_uuid
+  changed_when: false
+
+- name: Mount data disk on the local-path storage directory
+  ansible.posix.mount:
+    path: "{{ k3s_data_mountpoint }}"
+    src: "UUID={{ worker_storage_uuid.stdout }}"
+    fstype: ext4
+    opts: defaults,noatime
+    state: mounted

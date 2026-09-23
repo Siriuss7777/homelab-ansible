@@ -1,0 +1,4 @@
+---
+# Data disk on the 1 TB SSD, mounted where local-path-provisioner stores PVs.
+# Check the device with `lsblk` on the VM before the first run (e.g. /dev/sdb).
+k3s_data_disk: ""

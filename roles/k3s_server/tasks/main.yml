@@ -1,0 +1,35 @@
+---
+- name: Create K3s config directory
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0755"
+
+- name: Write K3s server config
+  ansible.builtin.copy:
+    dest: /etc/rancher/k3s/config.yaml
+    content: "{{ k3s_server_config | to_nice_yaml(indent=2) }}"
+    mode: "0600"
+  notify: Restart k3s
+
+- name: Download K3s install script
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /usr/local/bin/k3s-install.sh
+    mode: "0755"
+
+- name: Install K3s server
+  ansible.builtin.command: /usr/local/bin/k3s-install.sh
+  args:
+    creates: /usr/local/bin/k3s
+  environment: "{{ k3s_install_env | combine({'INSTALL_K3S_EXEC': 'server'}) }}"
+
+- name: Ensure K3s is running
+  ansible.builtin.service:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: Wait for the join token
+  ansible.builtin.wait_for:
+    path: /var/lib/rancher/k3s/server/node-token

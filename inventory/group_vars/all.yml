@@ -1,0 +1,12 @@
+---
+# ansible_user: ""  # defaults to your local user; set it if the template uses another one
+ansible_become: true
+
+vm_template_ip: 192.168.0.204
+
+# Every clone on the template IP has fresh host keys: skip known_hosts for it only.
+ansible_ssh_common_args: >-
+  {{ '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+     if ansible_host == vm_template_ip else '' }}
+
+timezone: Europe/London

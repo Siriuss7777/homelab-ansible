@@ -1,0 +1,54 @@
+---
+- name: Require the master to be off the template IP
+  ansible.builtin.assert:
+    that: k3s_api_host != vm_template_ip
+    fail_msg: >-
+      k3s-master still points at the template IP {{ vm_template_ip }}.
+      Give it its final IP in inventory/hosts.yml before joining the worker.
+
+- name: Require the data disk to be mounted before installing the agent
+  ansible.builtin.command: findmnt --mountpoint {{ k3s_data_mountpoint }}
+  changed_when: false
+
+- name: Read join token from the master
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  delegate_to: "{{ groups['k3s_masters'][0] }}"
+  register: k3s_agent_token
+  no_log: true
+
+- name: Create K3s config directory
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0755"
+
+- name: Write K3s agent config
+  ansible.builtin.copy:
+    dest: /etc/rancher/k3s/config.yaml
+    content: "{{ k3s_agent_config | to_nice_yaml(indent=2) }}"
+    mode: "0600"
+  vars:
+    k3s_agent_config:
+      server: "{{ k3s_api_url }}"
+      token: "{{ k3s_agent_token.content | b64decode | trim }}"
+  no_log: true
+  notify: Restart k3s-agent
+
+- name: Download K3s install script
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /usr/local/bin/k3s-install.sh
+    mode: "0755"
+
+- name: Install K3s agent
+  ansible.builtin.command: /usr/local/bin/k3s-install.sh
+  args:
+    creates: /usr/local/bin/k3s
+  environment: "{{ k3s_install_env | combine({'INSTALL_K3S_EXEC': 'agent'}) }}"
+
+- name: Ensure K3s agent is running
+  ansible.builtin.service:
+    name: k3s-agent
+    state: started
+    enabled: true
