@@ -29,11 +29,11 @@ Run only one fresh clone at a time. `sudo` needs a password, so Ansible prompts 
    `ansible-playbook playbooks/bootstrap.yml --limit k3s-master`
    It sets the hostname, regenerates the machine-id and SSH host keys, sets the static IP
    of `k3s-master` from `~/.ssh/config` and reboots onto it.
-2. `ansible-playbook playbooks/site.yml --limit k3s-master` installs the K3s server.
+2. `ansible-playbook playbooks/cluster.yml --limit k3s-master` installs the K3s server.
 3. Same for the worker: add its data disk in Proxmox, set `k3s_data_disk` in
    `inventory/host_vars/k3s-worker.yml` (check `lsblk`), then
    `ansible-playbook playbooks/bootstrap.yml --limit k3s-worker` and
-   `ansible-playbook playbooks/site.yml --limit k3s-worker`.
+   `ansible-playbook playbooks/cluster.yml --limit k3s-worker`.
 
 Rebuilding a node gives it new host keys: run `ssh-keygen -R <ip>` first, since
 known_hosts refuses a changed key.
