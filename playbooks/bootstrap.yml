@@ -1,19 +1,24 @@
 ---
-# Turn a fresh template clone into a cluster node:
-#   ansible-playbook playbooks/bootstrap.yml -e node=k3s-master
+# Turn a fresh template clone into a cluster node, one at a time:
+#   ansible-playbook playbooks/bootstrap.yml --limit k3s-master
 - name: Bootstrap template clone
-  hosts: template
+  hosts: k3s_cluster
+  vars:
+    # Reach the node through the template's SSH alias until it has its own IP.
+    ansible_host: "{{ template_host }}"
+    # Every fresh clone answers on the template IP with new host keys.
+    ansible_ssh_common_args: -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
   pre_tasks:
-    - name: Require a known target node
+    - name: Require a single node (all clones share the template IP)
       ansible.builtin.assert:
-        that: node is defined and node in groups['k3s_cluster']
-        fail_msg: "Pass -e node=<{{ groups['k3s_cluster'] | join('|') }}>"
+        that: ansible_play_hosts_all | length == 1
+        fail_msg: "Use --limit <{{ groups['k3s_cluster'] | join('|') }}>"
+      run_once: true
   roles:
-    - role: bootstrap
-      bootstrap_node: "{{ node }}"
+    - bootstrap
 
 - name: Check the node is reachable under its own name
-  hosts: "{{ node | default('k3s_cluster:!k3s_cluster') }}"
+  hosts: k3s_cluster
   tasks:
     - name: Assert hostname
       ansible.builtin.assert:

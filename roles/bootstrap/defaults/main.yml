@@ -1,5 +1,5 @@
 ---
-bootstrap_node: ""
+bootstrap_node: "{{ inventory_hostname }}"
 bootstrap_interface: ens18
 bootstrap_prefix: 24
 
