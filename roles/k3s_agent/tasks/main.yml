@@ -1,11 +1,4 @@
 ---
-- name: Require the master to be off the template IP
-  ansible.builtin.assert:
-    that: k3s_api_host != vm_template_ip
-    fail_msg: >-
-      k3s-master still points at the template IP {{ vm_template_ip }}.
-      Give it its final IP in inventory/hosts.yml before joining the worker.
-
 - name: Require the data disk to be mounted before installing the agent
   ansible.builtin.command: findmnt --mountpoint {{ k3s_data_mountpoint }}
   changed_when: false

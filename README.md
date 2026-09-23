@@ -14,26 +14,33 @@ pip install ansible-core
 ansible-galaxy collection install -r requirements.yml
 ```
 
+## Hosts come from `~/.ssh/config`
+
+The inventory holds no IPs: `homeserver-template`, `k3s-master` and `k3s-worker` are
+SSH aliases, and `HostName`/`User`/`Port` are read from `~/.ssh/config`.
+To move a node, change its `HostName` there.
+
 ## Workflow: from template clone to cluster node
 
-Both VMs start as clones of the Proxmox template, on the template IP **192.168.0.204**.
-Run only one clone at a time on that IP.
+Every clone of the Proxmox template (Debian 13) boots as `homeserver-template` (192.168.0.204).
+Run only one fresh clone at a time. `sudo` needs a password, so Ansible prompts for it.
 
-1. **Master:** boot it alone, then
-   `ansible-playbook playbooks/bootstrap.yml --limit k3s-master`
-   (sets hostname, regenerates machine-id + SSH host keys, base packages).
-2. Give the master its final IP, update `ansible_host` in `inventory/hosts.yml`.
-3. `ansible-playbook playbooks/site.yml --limit k3s-master` installs the K3s server.
-4. **Worker:** boot it, set `k3s_data_disk` in `inventory/host_vars/k3s-worker.yml` (check `lsblk`), then
-   `ansible-playbook playbooks/bootstrap.yml --limit k3s-worker`.
-5. Give it its final IP, update `inventory/hosts.yml`, then
-   `ansible-playbook playbooks/site.yml --limit k3s-worker` mounts the data disk and joins the cluster.
+1. Clone the template, boot the clone, then
+   `ansible-playbook playbooks/bootstrap.yml -e node=k3s-master`
+   It sets the hostname, regenerates the machine-id and SSH host keys, sets the static IP
+   of `k3s-master` from `~/.ssh/config` and reboots onto it.
+2. `ansible-playbook playbooks/site.yml --limit k3s-master` installs the K3s server.
+3. Same for the worker: add its data disk in Proxmox, set `k3s_data_disk` in
+   `inventory/host_vars/k3s-worker.yml` (check `lsblk`), then
+   `ansible-playbook playbooks/bootstrap.yml -e node=k3s-worker` and
+   `ansible-playbook playbooks/site.yml --limit k3s-worker`.
 
-`site.yml` is idempotent: it can be re-run against the whole cluster once both nodes have their final IP.
+Rebuilding a node gives it new host keys: run `ssh-keygen -R <ip>` first, since
+known_hosts refuses a changed key.
 
 ## Layout
 
-- `roles/bootstrap`: de-templates a clone (hostname, machine-id, SSH host keys)
+- `roles/bootstrap`: turns a template clone into a node (hostname, machine-id, SSH host keys, static IP, reboot)
 - `roles/common`: packages, qemu-guest-agent, swap off, kernel modules, sysctls
 - `roles/worker_storage`: formats (if blank) and mounts the data disk **before** the K3s agent
 - `roles/k3s_server` / `roles/k3s_agent`: K3s install via `get.k3s.io`, config in `/etc/rancher/k3s/config.yaml`

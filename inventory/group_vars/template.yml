@@ -1,0 +1,3 @@
+---
+# Every fresh clone answers on the template IP with new host keys.
+ansible_ssh_common_args: -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null

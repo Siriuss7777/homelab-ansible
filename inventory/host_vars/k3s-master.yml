@@ -6,4 +6,4 @@ k3s_server_config:
   node-taint:
     - CriticalAddonsOnly=true:NoExecute  # workloads run on the worker only
   tls-san:
-    - "{{ ansible_host }}"
+    - "{{ k3s_api_host }}"

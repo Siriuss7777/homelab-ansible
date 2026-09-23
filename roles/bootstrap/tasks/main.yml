@@ -1,57 +1,73 @@
 ---
-# A clone of the template shares machine-id and SSH host keys with every other
-# clone. Regenerate them once, tracked by a marker file.
-- name: Set hostname
-  ansible.builtin.hostname:
-    name: "{{ inventory_hostname }}"
-
-- name: Resolve hostname locally
+# A clone shares hostname, machine-id, SSH host keys and IP with the template.
+# Give it its own, then reboot onto the node's IP.
+- name: Drop the template's /etc/hosts entry
   ansible.builtin.lineinfile:
     path: /etc/hosts
-    regexp: '^127\.0\.1\.1\s'
-    line: "127.0.1.1 {{ inventory_hostname }}"
+    regexp: '\s{{ ansible_facts.hostname }}(\s|$)'
+    state: absent
 
-- name: Check de-templating marker
-  ansible.builtin.stat:
-    path: "{{ bootstrap_marker }}"
-  register: bootstrap_marker_stat
+- name: Resolve the node name locally
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    insertafter: '^127\.0\.0\.1\s'
+    line: >-
+      {{ bootstrap_ip }}
+      {{ bootstrap_node ~ '.' ~ ansible_facts.domain if ansible_facts.domain else '' }}
+      {{ bootstrap_node }}
 
-- name: De-template the clone
-  when: not bootstrap_marker_stat.stat.exists
-  block:
-    - name: Remove cloned machine-id
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - /etc/machine-id
-        - /var/lib/dbus/machine-id
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ bootstrap_node }}"
 
-    - name: Generate a new machine-id
-      ansible.builtin.command: systemd-machine-id-setup
-      changed_when: true
+- name: Remove the template's machine-id
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/machine-id
+    - /var/lib/dbus/machine-id
 
-    - name: Find cloned SSH host keys
-      ansible.builtin.find:
-        paths: /etc/ssh
-        patterns: "ssh_host_*"
-      register: bootstrap_host_keys
+- name: Generate a new machine-id
+  ansible.builtin.command: systemd-machine-id-setup
+  changed_when: true
 
-    - name: Remove cloned SSH host keys
-      ansible.builtin.file:
-        path: "{{ item.path }}"
-        state: absent
-      loop: "{{ bootstrap_host_keys.files }}"
-      loop_control:
-        label: "{{ item.path }}"
+- name: Find the template's SSH host keys
+  ansible.builtin.find:
+    paths: /etc/ssh
+    patterns: "ssh_host_*"
+  register: bootstrap_host_keys
 
-    - name: Generate new SSH host keys
-      ansible.builtin.command: ssh-keygen -A
-      changed_when: true
-      notify: Restart ssh
+- name: Remove the template's SSH host keys
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ bootstrap_host_keys.files }}"
+  loop_control:
+    label: "{{ item.path }}"
 
-    - name: Write de-templating marker
-      ansible.builtin.copy:
-        dest: "{{ bootstrap_marker }}"
-        content: "{{ inventory_hostname }}\n"
-        mode: "0644"
+- name: Generate new SSH host keys
+  ansible.builtin.command: ssh-keygen -A
+  changed_when: true
+
+- name: Set the node's static IP
+  ansible.builtin.lineinfile:
+    path: /etc/network/interfaces
+    regexp: '^\s*address\s'
+    insertafter: '^iface {{ bootstrap_interface }} inet static'
+    line: "\taddress {{ bootstrap_ip }}/{{ bootstrap_prefix }}"
+
+- name: Reboot onto the new IP
+  ansible.builtin.shell: sleep 2 && systemctl reboot
+  async: 1
+  poll: 0
+  changed_when: true
+
+- name: Wait for SSH on the new IP
+  ansible.builtin.wait_for:
+    host: "{{ bootstrap_ip }}"
+    port: "{{ bootstrap_port | int }}"
+    delay: 10
+    timeout: 300
+  delegate_to: localhost
+  become: false

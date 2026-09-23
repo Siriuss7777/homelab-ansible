@@ -1,2 +1,9 @@
 ---
-bootstrap_marker: /etc/.ansible-detemplated
+bootstrap_node: ""
+bootstrap_interface: ens18
+bootstrap_prefix: 24
+
+# Target address and port come from the node's ~/.ssh/config entry.
+bootstrap_ssh_config: "{{ lookup('pipe', 'ssh -G ' ~ bootstrap_node) }}"
+bootstrap_ip: "{{ bootstrap_ssh_config | regex_search('^hostname (\\S+)$', '\\1', multiline=True) | first }}"
+bootstrap_port: "{{ bootstrap_ssh_config | regex_search('^port (\\d+)$', '\\1', multiline=True) | first }}"

@@ -1,7 +1,20 @@
 ---
-# Only de-template a fresh clone (hostname, machine-id, SSH host keys) + base packages.
-- name: Bootstrap cloned VMs
-  hosts: k3s_cluster
+# Turn a fresh template clone into a cluster node:
+#   ansible-playbook playbooks/bootstrap.yml -e node=k3s-master
+- name: Bootstrap template clone
+  hosts: template
+  pre_tasks:
+    - name: Require a known target node
+      ansible.builtin.assert:
+        that: node is defined and node in groups['k3s_cluster']
+        fail_msg: "Pass -e node=<{{ groups['k3s_cluster'] | join('|') }}>"
   roles:
-    - bootstrap
-    - common
+    - role: bootstrap
+      bootstrap_node: "{{ node }}"
+
+- name: Check the node is reachable under its own name
+  hosts: "{{ node | default('k3s_cluster:!k3s_cluster') }}"
+  tasks:
+    - name: Assert hostname
+      ansible.builtin.assert:
+        that: ansible_facts.hostname == inventory_hostname
