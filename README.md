@@ -16,9 +16,20 @@ ansible-galaxy collection install -r requirements.yml
 
 ## Hosts come from `~/.ssh/config`
 
-The inventory holds no IPs: `homeserver-template`, `k3s-master` and `k3s-worker` are
-SSH aliases, and `HostName`/`User`/`Port` are read from `~/.ssh/config`.
-To move a node, change its `HostName` there.
+The inventory holds no IPs: `k3s-master` and `k3s-worker` are SSH aliases, and
+`HostName`/`User`/`Port` are read from `~/.ssh/config`. To move a node, change its `HostName` there.
+
+`homeserver-template` (the `template_host` variable) is the alias fresh template clones answer on.
+It is not an inventory host: the bootstrap play reaches the node through it.
+
+## Playbooks
+
+| Playbook | When | What it does |
+|---|---|---|
+| `playbooks/bootstrap.yml` | once per fresh clone | Connects through `homeserver-template`, gives the clone the node's hostname, a new machine-id and SSH host keys, sets the node's static IP from `~/.ssh/config`, reboots onto it. Refuses to run on more than one host. |
+| `playbooks/cluster.yml` | any time (idempotent) | Brings nodes to their final state: base OS (`common`), worker data disk (`worker_storage`), K3s server on the master, K3s agent on the worker. |
+
+Both are run one node at a time with `--limit`.
 
 ## Workflow: from template clone to cluster node
 
